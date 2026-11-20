@@ -1,8 +1,8 @@
 name: 1. Schedule checkout
 on:
-  schedule:
-    # TEST: every 5 minutes, Mon-Fri. For normal use, replace with the two lines below.
-    - cron: '*/5 * * * 1-5'
+  # schedule:
+    # TEST mode: triggered every 5 min (Mon-Fri) by the cron-job.org job "hrms-5min-trigger".
+    # For normal use: delete that job and uncomment the two lines below.
     # - cron: '0 11 * * 1-5'   # 16:30 IST, Mon-Fri
     # - cron: '0 13 * * 1-5'   # 18:30 IST, catches late check-ins
   workflow_dispatch:

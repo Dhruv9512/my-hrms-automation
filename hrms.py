@@ -150,40 +150,76 @@ def schedule_checkout(at):
             "body": '{"ref":"main"}',
         },
     }})
-    print(f"Checkout scheduled for {at:%Y-%m-%d %H:%M} IST")
 
 
 # ------------------------------------------------------------------- main
 
+_summary = []
+
+
+def log(msg):
+    """Print to the Actions log and collect for the run's summary page."""
+    print(msg, flush=True)
+    _summary.append(msg)
+
+
+def write_summary():
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a") as f:
+            f.write("### HRMS auto-checkout\n\n" + "\n".join(f"- {m}" for m in _summary) + "\n")
+
+
+def hm(seconds):
+    seconds = max(0, int(seconds))
+    return f"{seconds // 3600}h {seconds % 3600 // 60:02d}m"
+
+
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "status"
     now = datetime.now(IST)
+    log(f"Mode: {mode} | Time now: {now:%Y-%m-%d %H:%M:%S} IST | Target: {hm(TARGET_SECONDS)}")
+
+    log("Logging in to HRMS...")
     token = login()
+    log("Login OK")
+
     info = today(token)
+    att = info.get("attendance") or {}
     st = state(info)
     worked, on_break = worked_seconds(info, now)
     remaining = TARGET_SECONDS - worked
-    print(f"[{now:%H:%M} IST] state={st} worked={worked // 3600}h{worked % 3600 // 60:02d}m"
-          f"{' (on break)' if on_break else ''}")
+    log(f"Check-in: {att.get('check_in_time') or '-'} | Check-out: {att.get('check_out_time') or '-'}"
+        f" | Breaks: {len(info.get('breaks') or [])}{' (ON BREAK now)' if on_break else ''}")
+    log(f"Status: {st} | Worked: {hm(worked)} | Remaining to target: {hm(remaining)}")
 
-    if mode == "status" or st != "working":
-        if st != "working":
-            print("Nothing to do.")
+    if st == "not_checked_in":
+        log("RESULT: You have not checked in today. Nothing to do.")
+        return
+    if st == "checked_out":
+        log("RESULT: Already checked out today. Nothing to do.")
+        return
+    if mode == "status":
+        log("RESULT: Status only, no action taken.")
         return
 
-    if mode in ("schedule", "checkout") and remaining <= 0 or mode == "checkout" and remaining <= BUFFER_MINUTES * 60:
+    if remaining <= 0 or (mode == "checkout" and remaining <= BUFFER_MINUTES * 60):
+        log("Target reached -> calling CHECKOUT...")
         res = do_checkout(token)
-        print("Checked out:", res.get("message", res))
+        log(f"RESULT: CHECKED OUT. HRMS says: {res.get('message', res)}")
         return
 
-    if mode in ("schedule", "checkout"):
-        # Not done yet (or a break was taken after scheduling): (re)schedule.
-        at = now + timedelta(seconds=max(remaining, 0))
-        schedule_checkout(at.replace(second=0, microsecond=0) + timedelta(minutes=2))
-        return
-
-    sys.exit(f"Unknown mode: {mode}")
+    # Not done yet (or a break was taken after scheduling): (re)schedule.
+    at = (now + timedelta(seconds=remaining)).replace(second=0, microsecond=0) + timedelta(minutes=2)
+    schedule_checkout(at)
+    log(f"RESULT: Target not reached yet. Checkout alarm set on cron-job.org for {at:%H:%M} IST")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        log(f"ERROR: {e}")
+        raise
+    finally:
+        write_summary()
