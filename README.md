@@ -2,7 +2,7 @@
 
 Auto-checkout bot for the Amilek HRMS. Calls the HRMS API directly (no browser).
 
-1. **Schedule checkout** runs at 16:30 and 18:30 IST on weekdays. It reads today's worked time
+1. **Schedule checkout** is started at 16:30 and 18:30 IST on weekdays by the cron-job.org job `hrms-daily-trigger`. It reads today's worked time
    (breaks excluded) and creates a one-shot cron-job.org job for the minute 8h is reached.
 2. That job triggers **Checkout**, which re-checks the hours and checks out, or reschedules
    if a break pushed the time back.
