@@ -24,7 +24,6 @@ import requests
 API = os.environ.get("HRMS_API", "https://hrms-amilek-wrdu.onrender.com")
 IST = ZoneInfo("Asia/Kolkata")
 TARGET_SECONDS = int(os.environ.get("TARGET_MINUTES", "480")) * 60  # 480 = 8h
-BUFFER_MINUTES = int(os.environ.get("BUFFER_MINUTES", "2"))
 JOB_TITLE = "hrms-auto-checkout"
 CHECKOUT_WORKFLOW = "checkout.yml"
 
@@ -203,14 +202,20 @@ def main():
         log("RESULT: Status only, no action taken.")
         return
 
-    if remaining <= 0 or (mode == "checkout" and remaining <= BUFFER_MINUTES * 60):
+    if remaining <= 0:
         log("Target reached -> calling CHECKOUT...")
         res = do_checkout(token)
         log(f"RESULT: CHECKED OUT. HRMS says: {res.get('message', res)}")
         return
 
     # Not done yet (or a break was taken after scheduling): (re)schedule.
-    at = (now + timedelta(seconds=remaining)).replace(second=0, microsecond=0) + timedelta(minutes=2)
+    # Alarm at the first whole minute at/after the exact 8h moment (cron-job.org is
+    # minute-precise; GitHub adds ~20-40s startup, so checkout lands <1 min after 8h).
+    exact = now + timedelta(seconds=remaining)
+    at = exact.replace(second=0, microsecond=0)
+    if at < exact:
+        at += timedelta(minutes=1)
+    log(f"Exact {hm(TARGET_SECONDS)} moment: {exact:%H:%M:%S} IST")
     schedule_checkout(at)
     log(f"RESULT: Target not reached yet. Checkout alarm set on cron-job.org for {at:%H:%M} IST")
 
