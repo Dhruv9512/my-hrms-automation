@@ -23,7 +23,7 @@ import requests
 
 API = os.environ.get("HRMS_API", "https://hrms-amilek-wrdu.onrender.com")
 IST = ZoneInfo("Asia/Kolkata")
-TARGET_SECONDS = int(float(os.environ.get("TARGET_HOURS", "8")) * 3600)
+TARGET_SECONDS = int(os.environ.get("TARGET_MINUTES", "480")) * 60  # 480 = 8h
 BUFFER_MINUTES = int(os.environ.get("BUFFER_MINUTES", "2"))
 JOB_TITLE = "hrms-auto-checkout"
 CHECKOUT_WORKFLOW = "checkout.yml"
@@ -171,7 +171,7 @@ def main():
             print("Nothing to do.")
         return
 
-    if mode == "checkout" and remaining <= BUFFER_MINUTES * 60:
+    if mode in ("schedule", "checkout") and remaining <= 0 or mode == "checkout" and remaining <= BUFFER_MINUTES * 60:
         res = do_checkout(token)
         print("Checked out:", res.get("message", res))
         return

@@ -1,8 +1,10 @@
 name: 1. Schedule checkout
 on:
   schedule:
-    - cron: '0 11 * * 1-5'   # 16:30 IST, Mon-Fri
-    - cron: '0 13 * * 1-5'   # 18:30 IST, catches late check-ins (re-scheduling is idempotent)
+    # TEST: every 5 minutes, Mon-Fri. For normal use, replace with the two lines below.
+    - cron: '*/5 * * * 1-5'
+    # - cron: '0 11 * * 1-5'   # 16:30 IST, Mon-Fri
+    # - cron: '0 13 * * 1-5'   # 18:30 IST, catches late check-ins
   workflow_dispatch:
 
 jobs:
@@ -17,6 +19,7 @@ jobs:
       - run: pip install requests
       - run: python hrms.py schedule
         env:
+          TARGET_MINUTES: '15'   # TEST. Normal: '480' (8h)
           HRMS_EMAIL: ${{ secrets.HRMS_EMAIL }}
           HRMS_PASSWORD: ${{ secrets.HRMS_PASSWORD }}
           CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}

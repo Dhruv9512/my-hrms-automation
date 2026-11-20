@@ -14,6 +14,7 @@ jobs:
       - run: pip install requests
       - run: python hrms.py checkout
         env:
+          TARGET_MINUTES: '15'   # TEST. Normal: '480' (8h)
           HRMS_EMAIL: ${{ secrets.HRMS_EMAIL }}
           HRMS_PASSWORD: ${{ secrets.HRMS_PASSWORD }}
           CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
