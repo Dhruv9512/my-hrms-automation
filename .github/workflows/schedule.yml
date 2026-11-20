@@ -1,7 +1,7 @@
 name: 1. Schedule checkout
 on:
   # schedule:
-    # TEST mode: triggered every 5 min (Mon-Fri) by the cron-job.org job "hrms-5min-trigger".
+    # TEST mode: triggered every 2 min (Mon-Fri) by the cron-job.org job "hrms-5min-trigger".
     # For normal use: delete that job and uncomment the two lines below.
     # - cron: '0 11 * * 1-5'   # 16:30 IST, Mon-Fri
     # - cron: '0 13 * * 1-5'   # 18:30 IST, catches late check-ins
@@ -19,7 +19,7 @@ jobs:
       - run: pip install requests
       - run: python hrms.py schedule
         env:
-          TARGET_MINUTES: '15'   # TEST. Normal: '480' (8h)
+          TARGET_MINUTES: '445'  # TEST: 7h25m. Normal: '480' (8h)
           HRMS_EMAIL: ${{ secrets.HRMS_EMAIL }}
           HRMS_PASSWORD: ${{ secrets.HRMS_PASSWORD }}
           CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
