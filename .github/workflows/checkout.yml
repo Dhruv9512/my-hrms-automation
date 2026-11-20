@@ -4,6 +4,7 @@ on:
 
 jobs:
   checkout:
+    if: vars.AUTO_CHECKOUT_ENABLED != 'false'   # set repo variable to 'false' to pause
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

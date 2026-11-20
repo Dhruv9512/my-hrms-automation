@@ -17,4 +17,9 @@ Repo → Settings → Secrets and variables → Actions → add:
 | `CRONJOB_API_KEY` | cron-job.org API key |
 | `GH_DISPATCH_TOKEN` | Fine-grained PAT with **Actions: Read and write** on this repo |
 
+## Turn it on / off
+Repo → Settings → Secrets and variables → Actions → **Variables** tab → `AUTO_CHECKOUT_ENABLED`:
+- `false` → paused (both workflows are skipped)
+- `true` or variable missing → active
+
 Local check (read-only): `HRMS_EMAIL=... HRMS_PASSWORD=... python hrms.py status`
