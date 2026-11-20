@@ -1,7 +1,7 @@
 name: 1. Schedule checkout
 on:
   # schedule:
-    # Triggered at 16:30 and 18:30 IST, Mon-Fri, by the cron-job.org job "hrms-daily-trigger"
+    # Triggered at 16:30 IST, Mon-Fri, by the cron-job.org job "hrms-daily-trigger"
     # (more reliable than GitHub's own schedule). That run sets a one-time checkout alarm.
   workflow_dispatch:
 
