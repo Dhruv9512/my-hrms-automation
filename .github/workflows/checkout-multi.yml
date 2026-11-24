@@ -1,0 +1,22 @@
+name: M2. Checkout (multi-user)
+on:
+  workflow_dispatch:
+    inputs:
+      user:
+        description: User ID from HRMS_USERS
+        required: true
+  push:
+    branches: [multi-user]
+    paths: ['.github/workflows/checkout-multi.yml']
+
+jobs:
+  register:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Workflow registered."
+  checkout:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Dispatch test OK for user ${{ inputs.user }} on ${{ github.ref_name }}"
