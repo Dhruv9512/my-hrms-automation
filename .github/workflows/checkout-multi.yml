@@ -1,22 +1,31 @@
 name: M2. Checkout (multi-user)
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # started by each user's cron-job.org alarm "hrms-multi-checkout-<id>"
     inputs:
       user:
         description: User ID from HRMS_USERS
         required: true
-  push:
-    branches: [multi-user]
-    paths: ['.github/workflows/checkout-multi.yml']
+
+concurrency:
+  group: multi-checkout-${{ inputs.user }}
+  cancel-in-progress: false
 
 jobs:
-  register:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Workflow registered."
   checkout:
-    if: github.event_name == 'workflow_dispatch'
+    if: vars.MULTI_CHECKOUT_ENABLED != 'false'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - run: echo "Dispatch test OK for user ${{ inputs.user }} on ${{ github.ref_name }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - run: python hrms_multi.py checkout "${{ inputs.user }}"
+        env:
+          TARGET_MINUTES: '480'
+          DRY_RUN: ${{ vars.MULTI_DRY_RUN != 'false' }}
+          LOG_DETAILS: ${{ vars.MULTI_LOG_DETAILS == 'true' }}
+          HRMS_USERS: ${{ secrets.HRMS_USERS }}
+          CRONJOB_API_KEY: ${{ secrets.CRONJOB_API_KEY }}
+          GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
