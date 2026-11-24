@@ -7,7 +7,8 @@ Separate from the single-user setup on `main`. Nothing on `main` is used or chan
    sets that user's own cron-job.org alarm `hrms-multi-checkout-<id>` for the first minute after 8h.
 2. Each alarm starts **M2. Checkout (multi-user)** for **that one user** only.
 3. Each user has one permanent alarm job, updated daily (keeps within cron-job.org's free
-   100 API calls/day, which is shared with the single-user setup).
+   100 API calls/day (about 31 for scheduling 30 users, +1 per checkout
+   only when an alarm must be reset after a break), shared with the single-user setup).
 
 One user's error (wrong password etc.) does not stop the others; the run is marked failed at the end.
 
@@ -34,4 +35,6 @@ Reuses the existing `CRONJOB_API_KEY` and `GH_DISPATCH_TOKEN` secrets.
 - Make the repo **private**: logs of a public repo are public.
 - Every user must agree and add their own password.
 - Don't list someone who also uses the single-user setup (they'd get two schedulers).
-- Daily trigger (16:30 IST) is not created yet. Run M1 by hand from Actions → choose branch `multi-user`.
+- Daily trigger (16:30 IST) is not created yet. GitHub's **Run workflow** button may not appear for
+  workflows that exist only on a branch, so M1 is started via the API (ask Claude, or a cron-job.org job
+  POSTing `{"ref":"multi-user"}` to `.../actions/workflows/schedule-multi.yml/dispatches`).

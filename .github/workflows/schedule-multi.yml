@@ -6,12 +6,15 @@ on:
         description: 'Only this user ID (leave empty for all enabled users)'
         required: false
         default: ''
+  push:   # only so GitHub registers this branch-only workflow; the job below is skipped
+    branches: [multi-user]
+    paths: ['.github/workflows/schedule-multi.yml']
   # Daily trigger: a cron-job.org job (e.g. "hrms-multi-trigger") dispatching this
   # workflow with ref=multi-user at 16:30 IST, Mon-Fri. Not created yet.
 
 jobs:
   schedule:
-    if: vars.MULTI_CHECKOUT_ENABLED != 'false'   # repo variable 'false' pauses everyone
+    if: github.event_name == 'workflow_dispatch' && vars.MULTI_CHECKOUT_ENABLED != 'false'   # 'false' pauses everyone
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

@@ -103,11 +103,21 @@ def alarm_payload(uid, at):
     }
 
 
-def existing_alarms():
-    """One API call: {user_id: jobId} for our own prefix only (never touches other jobs)."""
-    jobs = _cron("GET", "/jobs").get("jobs", [])
-    return {j["title"][len(JOB_PREFIX):]: j["jobId"] for j in jobs
-            if j.get("title", "").startswith(JOB_PREFIX)}
+class Alarms(dict):
+    """{user_id: jobId} for our own prefix only (never touches other jobs).
+    Listed lazily: one API call, and only if an alarm actually has to be set."""
+
+    def __init__(self):
+        super().__init__()
+        self.loaded = False
+
+    def load(self):
+        if not self.loaded:
+            for j in _cron("GET", "/jobs").get("jobs", []):
+                if j.get("title", "").startswith(JOB_PREFIX):
+                    self[j["title"][len(JOB_PREFIX):]] = j["jobId"]
+            self.loaded = True
+        return self
 
 
 _last_create = [0.0]
@@ -115,6 +125,7 @@ _last_create = [0.0]
 
 def set_alarm(uid, at, alarms):
     payload = alarm_payload(uid, at)
+    alarms.load()
     if uid in alarms:
         _cron("PATCH", f"/jobs/{alarms[uid]}", json={"job": payload})  # 1 call, no per-minute cap
     else:
@@ -181,7 +192,7 @@ def main():
         log(f"{only}: disabled in HRMS_USERS - skipping")
         return
 
-    alarms = existing_alarms()
+    alarms = Alarms()
     failed = 0
     for uid, user in targets.items():
         try:
