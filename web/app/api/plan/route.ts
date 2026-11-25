@@ -21,6 +21,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Pick a weekday (Monday to Friday)" }, { status: 400 });
   if (leaveTime && !/^\d{2}:\d{2}$/.test(leaveTime))
     return NextResponse.json({ error: "Leave time must be HH:MM" }, { status: 400 });
+  // The scheduler runs 12:00-23:00 IST (cron-job.org window), so leave times must fall inside it.
+  if (leaveTime && (leaveTime < "12:00" || leaveTime > "22:59"))
+    return NextResponse.json({ error: "Leave time must be between 12:00 PM and 10:59 PM" }, { status: 400 });
   if (date === today && leaveTime && leaveTime <= ist().time.slice(0, 5))
     return NextResponse.json({ error: "That leave time has already passed today" }, { status: 400 });
   if (!updateText) return NextResponse.json({ error: "Write today's update" }, { status: 400 });

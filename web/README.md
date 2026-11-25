@@ -9,6 +9,8 @@ Next.js (React) app for Vercel + Neon Postgres. Separate from the GitHub Actions
   1. **📅 Scheduled day**: date + leave time (empty = 8 hours worked) + today's update + Slack channel.
      At that time: checkout, then the update is posted to the channel. One-off: afterwards the feature turns off.
   2. **⏱ Auto checkout**: Monday to Friday, checkout the minute 8 hours are completed (breaks excluded).
+     Optional **Today's update**: if written for today, it is posted to Slack right after the checkout;
+     if not, it only checks out.
 - **Admin** (emails in `ADMIN_EMAILS`): master switch for everyone + per-employee switch, at `/admin`.
 
 ## How the scheduling works
@@ -37,9 +39,9 @@ cron-job.org calls `GET /api/cron/tick` every minute (weekdays 08:00–23:59 IST
 
 ## cron-job.org (once, after deploy)
 Create one job: URL `https://<your-app>.vercel.app/api/cron/tick`, every minute,
-hours 8–23, weekdays Mon–Fri, timezone Asia/Kolkata, header `Authorization: Bearer <CRON_SECRET>`.
+hours 12–22 (every minute, 12:00–22:59), weekdays Mon–Fri, timezone Asia/Kolkata, header `Authorization: Bearer <CRON_SECRET>`.
 (Limited hours keep Neon's free compute allowance of 100 CU-hours/month. For the same reason the
-Scheduled day form accepts weekdays only.)
+Scheduled day form accepts weekdays only, and leave times between 12:00 and 22:59.)
 
 ## Test safely
 `DRY_RUN=true` (default): everything runs, checkouts are only simulated (Slack updates are real).

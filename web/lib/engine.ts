@@ -77,15 +77,30 @@ async function finishPlan(run: Run, status: "done" | "failed" | "missed", result
               AND NOT EXISTS (SELECT 1 FROM day_plans WHERE employee_id = ${run.employee_id} AND status = 'pending' AND id <> ${run.plan_id})`;
 }
 
-async function postUpdate(emp: Record<string, any>, plan: Record<string, any> | undefined): Promise<string> {
-  if (!plan) return "";
-  if (!emp.slack_token_enc) return " Slack: not connected, update NOT sent.";
+async function sendToSlack(emp: Record<string, any>, channel: string, text: string): Promise<{ ok: boolean; note: string }> {
+  if (!emp.slack_token_enc) return { ok: false, note: " Slack: not connected, update NOT sent." };
   try {
-    await slackPost(decrypt(emp.slack_token_enc), plan.channel, plan.update_text);
-    return ` Update posted to #${plan.channel.replace(/^#/, "")}.`;
+    await slackPost(decrypt(emp.slack_token_enc), channel, text);
+    return { ok: true, note: ` Update posted to #${channel.replace(/^#/, "")}.` };
   } catch (e) {
-    return ` Slack failed: ${(e as Error).message}`;
+    return { ok: false, note: ` Slack failed: ${(e as Error).message}` };
   }
+}
+
+/** After checkout: Feature 1 posts the plan's update; Feature 2 posts today's update only if one was written. */
+async function postUpdate(emp: Record<string, any>, run: Run, plan: Record<string, any> | undefined): Promise<string> {
+  if (run.kind === "day_plan") {
+    if (!plan) return "";
+    return (await sendToSlack(emp, plan.channel, plan.update_text)).note;
+  }
+  const [u] = await sql`SELECT update_text, channel FROM auto_updates
+                        WHERE employee_id = ${emp.id} AND update_date = ${run.run_date} AND status = 'pending'`;
+  if (!u) return ""; // no update for today: checkout only, nothing sent
+  const r = await sendToSlack(emp, u.channel, u.update_text);
+  await sql`UPDATE auto_updates SET status = ${r.ok ? "sent" : "failed"}, result = ${r.note.trim()},
+              sent_at = CASE WHEN ${r.ok} THEN now() ELSE NULL END, updated_at = now()
+            WHERE employee_id = ${emp.id} AND update_date = ${run.run_date}`;
+  return r.note;
 }
 
 export async function processRun(run: Run, now = new Date()) {
@@ -114,7 +129,7 @@ export async function processRun(run: Run, now = new Date()) {
     }
 
     if (state === "checked_out") {
-      const extra = await postUpdate(emp, plan);
+      const extra = await postUpdate(emp, run, plan);
       await finishPlan(run, "done", `You checked out yourself.${extra}`);
       await logEvent(emp.id, `Already checked out manually.${extra}`);
       return setRun(run, { status: "done", message: `You checked out yourself.${extra}` });
@@ -135,7 +150,7 @@ export async function processRun(run: Run, now = new Date()) {
         const res = await hrmsCheckout(token);
         msg = `Checked out at ${t.time.slice(0, 5)} (worked ${hm(worked)}). HRMS: ${res.message || "OK"}.`;
       }
-      msg += await postUpdate(emp, plan);
+      msg += await postUpdate(emp, run, plan);
       await finishPlan(run, "done", msg);
       await logEvent(emp.id, msg);
       return setRun(run, { status: "done", message: msg, target });

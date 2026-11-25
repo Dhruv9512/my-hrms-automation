@@ -5,6 +5,7 @@ type Me = {
   name: string; email: string; mode: "off" | "day_plan" | "auto"; adminDisabled: boolean; paused: boolean; isAdmin: boolean;
   slackConnected: boolean; defaultChannel: string; dryRun: boolean; today: string;
   plan: { plan_date: string; leave_time: string | null; update_text: string; channel: string } | null;
+  autoUpdate: { update_text: string; channel: string; status: "pending" | "sent" | "failed"; result: string | null } | null;
   run: { kind: string; status: string; message: string | null } | null;
   history: { plan_date: string; status: string; result: string | null }[];
   logs: { at: string; level: string; message: string }[];
@@ -27,6 +28,8 @@ export default function Dashboard() {
   const [flash, setFlash] = useState<[string, string] | null>(null);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ date: "", leaveTime: "", updateText: "", channel: "" });
+  const [autoEditing, setAutoEditing] = useState(false);
+  const [autoForm, setAutoForm] = useState({ updateText: "", channel: "" });
 
   const load = useCallback(async () => {
     const res = await fetch("/api/me", { cache: "no-store" });
@@ -101,6 +104,17 @@ export default function Dashboard() {
     await api("/api/mode", "POST", { mode: "auto" }, "Auto checkout is ON. You'll be checked out at 8 hours, Monday to Friday.");
   }
 
+  function openAutoForm() {
+    setAutoForm({ updateText: me!.autoUpdate?.update_text || "", channel: me!.autoUpdate?.channel || me!.defaultChannel || "" });
+    setAutoEditing(true);
+  }
+
+  async function submitAutoUpdate(e: FormEvent) {
+    e.preventDefault();
+    const ok = await api("/api/auto-update", "POST", autoForm, `Saved. It will be posted to #${autoForm.channel} right after today's checkout.`);
+    if (ok) setAutoEditing(false);
+  }
+
   async function submitPlan(e: FormEvent) {
     e.preventDefault();
     const ok = await api("/api/plan", "POST", form, `Scheduled for ${prettyDate(form.date)}${form.leaveTime ? ` at ${form.leaveTime}` : " at 8 hours worked"}.`);
@@ -169,7 +183,7 @@ export default function Dashboard() {
             <div className="spread">
               <div>
                 <h2>⏱ Auto checkout</h2>
-                <p className="muted small" style={{ margin: 0 }}>Every Monday to Friday, checks you out the minute you complete 8 hours (breaks not counted).</p>
+                <p className="muted small" style={{ margin: 0 }}>Every Monday to Friday, checks you out the minute you complete 8 hours (breaks not counted). Optional: add today's update for Slack.</p>
               </div>
               <button className="switch" role="switch" aria-checked={autoOn} aria-label="Auto checkout" disabled={busy || blocked} onClick={toggleAuto} />
             </div>
@@ -181,6 +195,53 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {autoOn && (
+        <section className="card">
+          <div className="spread">
+            <h2>📝 Today's update <span className="muted small" style={{ fontWeight: 400 }}>(optional)</span></h2>
+            {me.autoUpdate && (
+              me.autoUpdate.status === "sent" ? <span className="pill on">✓ Sent</span>
+              : me.autoUpdate.status === "failed" ? <span className="pill bad">Not sent</span>
+              : <span className="pill brand">Will be sent after checkout</span>
+            )}
+          </div>
+          <p className="muted small" style={{ marginTop: 4 }}>
+            Write it any time before your checkout. It is posted to Slack right after today's auto checkout.
+            No update = checkout only, nothing is posted.
+          </p>
+
+          {me.autoUpdate && !autoEditing ? (
+            <>
+              <ul className="list">
+                <li><b>Channel:</b> #{me.autoUpdate.channel}</li>
+                <li><b>Update:</b> <span style={{ whiteSpace: "pre-wrap" }}>{me.autoUpdate.update_text}</span></li>
+                {me.autoUpdate.status !== "pending" && me.autoUpdate.result && <li className="muted">{me.autoUpdate.result}</li>}
+              </ul>
+              {me.autoUpdate.status === "pending" && (
+                <div className="row" style={{ marginTop: 8 }}>
+                  <button className="btn ghost" disabled={busy || blocked} onClick={openAutoForm}>Edit</button>
+                  <button className="btn danger" disabled={busy || blocked} onClick={() => api("/api/auto-update", "DELETE", undefined, "Today's update removed. Checkout only.")}>Remove</button>
+                </div>
+              )}
+            </>
+          ) : autoEditing ? (
+            <form onSubmit={submitAutoUpdate}>
+              <label htmlFor="aupdate">Update for today ({prettyDate(me.today)})</label>
+              <textarea id="aupdate" required maxLength={3000} placeholder={"- Finished login page\n- Fixed payroll bug"} value={autoForm.updateText} onChange={(e) => setAutoForm({ ...autoForm, updateText: e.target.value })} />
+              <label htmlFor="achannel">Slack channel</label>
+              <div className="chan"><span>#</span><input id="achannel" required placeholder="daily-updates" value={autoForm.channel} onChange={(e) => setAutoForm({ ...autoForm, channel: e.target.value.replace(/^#/, "") })} /></div>
+              {!me.slackConnected && <div className="banner warn small" style={{ marginTop: 12 }}>Slack is not connected yet, so the update won't be sent. Connect Slack below.</div>}
+              <div className="row" style={{ marginTop: 16 }}>
+                <button className="btn" disabled={busy}>{busy ? "Saving…" : "Save update"}</button>
+                <button type="button" className="btn ghost" onClick={() => setAutoEditing(false)} disabled={busy}>Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <button className="btn ghost" disabled={busy || blocked} onClick={openAutoForm}>+ Add today's update</button>
+          )}
+        </section>
+      )}
+
       {showForm && (
         <form className="card" onSubmit={submitPlan}>
           <h2>📅 Schedule a day</h2>
@@ -191,8 +252,8 @@ export default function Dashboard() {
             </div>
             <div>
               <label htmlFor="leave">Leave time <span className="muted">(optional)</span></label>
-              <input id="leave" type="time" value={form.leaveTime} onChange={(e) => setForm({ ...form, leaveTime: e.target.value })} />
-              <p className="muted small" style={{ margin: "6px 0 0" }}>Empty = check out when you complete <b>8 hours</b>.</p>
+              <input id="leave" type="time" min="12:00" max="22:59" value={form.leaveTime} onChange={(e) => setForm({ ...form, leaveTime: e.target.value })} />
+              <p className="muted small" style={{ margin: "6px 0 0" }}>Between 12:00 PM and 10:59 PM. Empty = check out when you complete <b>8 hours</b>.</p>
             </div>
           </div>
           {form.leaveTime && <div className="banner warn small" style={{ marginTop: 12 }}>If this time is before you complete 8 hours, HRMS may mark an <b>early checkout</b> or <b>half day</b>.</div>}

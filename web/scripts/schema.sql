@@ -63,3 +63,16 @@ CREATE TABLE IF NOT EXISTS run_logs (
   message     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS run_logs_emp ON run_logs (employee_id, at DESC);
+
+-- Feature 2 extra: optional "today's update" posted to Slack after the auto checkout
+CREATE TABLE IF NOT EXISTS auto_updates (
+  employee_id  INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  update_date  DATE NOT NULL,
+  update_text  TEXT NOT NULL,
+  channel      TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+  result       TEXT,
+  sent_at      TIMESTAMPTZ,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (employee_id, update_date)
+);

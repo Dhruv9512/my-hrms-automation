@@ -24,6 +24,8 @@ export async function GET() {
     sql`SELECT at, level, message FROM run_logs WHERE employee_id = ${e.id} ORDER BY at DESC LIMIT 8`,
     isPaused(),
   ]);
+  const [autoUpdate] = await sql`SELECT update_text, channel, status, result FROM auto_updates
+                                 WHERE employee_id = ${e.id} AND update_date = ${today}`;
   return NextResponse.json({
     name: e.name,
     email: e.email,
@@ -36,6 +38,7 @@ export async function GET() {
     dryRun: DRY_RUN,
     today,
     plan: plan || null,
+    autoUpdate: autoUpdate || null,
     run: run || null,
     history,
     logs,
