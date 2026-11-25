@@ -86,6 +86,8 @@ export default function Dashboard() {
     if (planOn) {
       if (confirm("Turn off the scheduled day? Your plan will be cancelled.")) await api("/api/plan", "DELETE", undefined, "Scheduled day turned off.");
       setEditing(false);
+    } else if (editing) {
+      setEditing(false); // close the draft; nothing was saved
     } else {
       if (autoOn && !confirm("Only one feature can be on.\n\nTurning on 'Scheduled day' will switch OFF 'Auto checkout' after you submit the form. Continue?")) return;
       openPlanForm(me!);
@@ -138,17 +140,17 @@ export default function Dashboard() {
       <section>
         <div className="or">CHOOSE ONE · ONLY ONE FEATURE CAN BE ON AT A TIME</div>
         <div className="grid2">
-          <article className={`card feature ${planOn ? "active" : autoOn ? "dim" : ""}`}>
+          <article className={`card feature ${planOn ? "active" : autoOn && !editing ? "dim" : ""}`}>
             <div className="spread">
               <div>
                 <h2>📅 Scheduled day</h2>
                 <p className="muted small" style={{ margin: 0 }}>Pick a date and leave time. At that time you're checked out and your update is posted to Slack.</p>
               </div>
-              <button className="switch" role="switch" aria-checked={planOn || editing} aria-label="Scheduled day" disabled={busy || blocked} onClick={togglePlan} />
+              <button className="switch" role="switch" aria-checked={planOn} aria-label="Scheduled day" disabled={busy || blocked} onClick={togglePlan} />
             </div>
             <div className="note">
-              {planOn ? <span className="pill on">● ON</span> : <span className="pill">OFF</span>}
-              {autoOn && <span className="muted"> · Turning this on switches off Auto checkout</span>}
+              {planOn ? <span className="pill on">● ON</span> : editing ? <span className="pill warn">✎ DRAFT: submit the form below to turn on</span> : <span className="pill">OFF</span>}
+              {autoOn && <span className="muted"> · {editing ? "Auto checkout turns off when you submit" : "Turning this on switches off Auto checkout"}</span>}
             </div>
             {planOn && me.plan && !editing && (
               <div style={{ marginTop: 14 }}>

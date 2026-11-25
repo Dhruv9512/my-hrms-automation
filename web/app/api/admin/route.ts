@@ -25,12 +25,19 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
   if (typeof b.paused === "boolean") {
     await sql`UPDATE settings SET value = ${String(b.paused)} WHERE key = 'paused'`;
+    // Resuming: let today's runs that were skipped only because of the pause start again.
+    if (!b.paused)
+      await sql`DELETE FROM daily_runs WHERE run_date = ${ist().date} AND status = 'skipped' AND message = 'Paused by admin'`;
     await logEvent(null, `Admin ${r.emp.email} ${b.paused ? "PAUSED" : "resumed"} all employees`);
   } else if (Number.isInteger(b.employeeId) && typeof b.disabled === "boolean") {
     await sql`UPDATE employees SET admin_disabled = ${b.disabled}, updated_at = now() WHERE id = ${b.employeeId}`;
     if (b.disabled)
       await sql`UPDATE daily_runs SET status = 'skipped', message = 'Disabled by admin'
                 WHERE employee_id = ${b.employeeId} AND run_date = ${ist().date} AND status = 'waiting'`;
+    else
+      // Re-enabled: today's run skipped by the admin switch is recreated on the next tick.
+      await sql`DELETE FROM daily_runs WHERE employee_id = ${b.employeeId} AND run_date = ${ist().date}
+                AND status = 'skipped' AND message = 'Disabled by admin'`;
     await logEvent(b.employeeId, `Admin ${b.disabled ? "disabled" : "enabled"} automation for this employee`, "warn");
   } else {
     return NextResponse.json({ error: "Nothing to change" }, { status: 400 });
