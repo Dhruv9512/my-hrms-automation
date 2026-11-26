@@ -14,7 +14,7 @@ export async function GET() {
   const today = ist().date;
   const [[plan], [run], history, logs, paused] = await Promise.all([
     sql`SELECT id, plan_date::text AS plan_date, to_char(leave_time, 'HH24:MI') AS leave_time,
-               update_text, channel, status, result
+               update_text, channel, channel_label, status, result
         FROM day_plans WHERE employee_id = ${e.id} AND status = 'pending'
         ORDER BY plan_date LIMIT 1`,
     sql`SELECT kind, status, message, target_at, updated_at FROM daily_runs
@@ -24,7 +24,7 @@ export async function GET() {
     sql`SELECT at, level, message FROM run_logs WHERE employee_id = ${e.id} ORDER BY at DESC LIMIT 8`,
     isPaused(),
   ]);
-  const [autoUpdate] = await sql`SELECT update_text, channel, status, result FROM auto_updates
+  const [autoUpdate] = await sql`SELECT update_text, channel, channel_label, status, result FROM auto_updates
                                  WHERE employee_id = ${e.id} AND update_date = ${today}`;
   return NextResponse.json({
     name: e.name,
@@ -35,6 +35,7 @@ export async function GET() {
     isAdmin: isAdminEmail(e.email),
     slackConnected: !!e.slack_token_enc,
     defaultChannel: e.default_channel,
+    defaultChannelLabel: e.default_channel_label || (e.default_channel ? `#${e.default_channel}` : ""),
     dryRun: DRY_RUN,
     today,
     plan: plan || null,

@@ -14,22 +14,24 @@ export async function POST(req: Request) {
   if ("error" in r) return r.error;
   const b = await req.json().catch(() => ({}));
   const updateText = String(b.updateText || "").trim();
-  const channel = String(b.channel || "").trim().replace(/^#/, "");
+  const channel = String(b.channel || "").trim().replace(/^[#@]/, "");
+  const channelLabel = String(b.channelLabel || "").trim().slice(0, 120) || `#${channel}`;
   const today = ist().date;
 
   if (r.emp.mode !== "auto") return NextResponse.json({ error: "Turn on Auto checkout first" }, { status: 400 });
   if (!updateText) return NextResponse.json({ error: "Write today's update" }, { status: 400 });
   if (updateText.length > 3000) return NextResponse.json({ error: "Update is too long (max 3000 characters)" }, { status: 400 });
   if (!/^[A-Za-z0-9._-]{1,80}$/.test(channel))
-    return NextResponse.json({ error: "Enter a channel name like general or team-updates" }, { status: 400 });
+    return NextResponse.json({ error: "Choose where to send the update (a channel or a person)" }, { status: 400 });
   if (await alreadyHandled(r.emp.id, today))
     return NextResponse.json({ error: "Today's checkout is already done, so this update can no longer be changed" }, { status: 409 });
 
-  await sql`INSERT INTO auto_updates (employee_id, update_date, update_text, channel)
-            VALUES (${r.emp.id}, ${today}, ${updateText}, ${channel})
+  await sql`INSERT INTO auto_updates (employee_id, update_date, update_text, channel, channel_label)
+            VALUES (${r.emp.id}, ${today}, ${updateText}, ${channel}, ${channelLabel})
             ON CONFLICT (employee_id, update_date)
-            DO UPDATE SET update_text = EXCLUDED.update_text, channel = EXCLUDED.channel, updated_at = now()`;
-  await sql`UPDATE employees SET default_channel = ${channel}, updated_at = now() WHERE id = ${r.emp.id}`;
+            DO UPDATE SET update_text = EXCLUDED.update_text, channel = EXCLUDED.channel,
+                          channel_label = EXCLUDED.channel_label, updated_at = now()`;
+  await sql`UPDATE employees SET default_channel = ${channel}, default_channel_label = ${channelLabel}, updated_at = now() WHERE id = ${r.emp.id}`;
   return NextResponse.json({ ok: true });
 }
 

@@ -77,11 +77,11 @@ async function finishPlan(run: Run, status: "done" | "failed" | "missed", result
               AND NOT EXISTS (SELECT 1 FROM day_plans WHERE employee_id = ${run.employee_id} AND status = 'pending' AND id <> ${run.plan_id})`;
 }
 
-async function sendToSlack(emp: Record<string, any>, channel: string, text: string): Promise<{ ok: boolean; note: string }> {
+async function sendToSlack(emp: Record<string, any>, channel: string, label: string | null, text: string): Promise<{ ok: boolean; note: string }> {
   if (!emp.slack_token_enc) return { ok: false, note: " Slack: not connected, update NOT sent." };
   try {
     await slackPost(decrypt(emp.slack_token_enc), channel, text);
-    return { ok: true, note: ` Update posted to #${channel.replace(/^#/, "")}.` };
+    return { ok: true, note: ` Update sent to ${label || `#${channel.replace(/^#/, "")}`}.` };
   } catch (e) {
     return { ok: false, note: ` Slack failed: ${(e as Error).message}` };
   }
@@ -91,12 +91,12 @@ async function sendToSlack(emp: Record<string, any>, channel: string, text: stri
 async function postUpdate(emp: Record<string, any>, run: Run, plan: Record<string, any> | undefined): Promise<string> {
   if (run.kind === "day_plan") {
     if (!plan) return "";
-    return (await sendToSlack(emp, plan.channel, plan.update_text)).note;
+    return (await sendToSlack(emp, plan.channel, plan.channel_label, plan.update_text)).note;
   }
-  const [u] = await sql`SELECT update_text, channel FROM auto_updates
+  const [u] = await sql`SELECT update_text, channel, channel_label FROM auto_updates
                         WHERE employee_id = ${emp.id} AND update_date = ${run.run_date} AND status = 'pending'`;
   if (!u) return ""; // no update for today: checkout only, nothing sent
-  const r = await sendToSlack(emp, u.channel, u.update_text);
+  const r = await sendToSlack(emp, u.channel, u.channel_label, u.update_text);
   await sql`UPDATE auto_updates SET status = ${r.ok ? "sent" : "failed"}, result = ${r.note.trim()},
               sent_at = CASE WHEN ${r.ok} THEN now() ELSE NULL END, updated_at = now()
             WHERE employee_id = ${emp.id} AND update_date = ${run.run_date}`;

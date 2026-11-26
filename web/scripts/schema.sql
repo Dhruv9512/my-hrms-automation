@@ -76,3 +76,9 @@ CREATE TABLE IF NOT EXISTS auto_updates (
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (employee_id, update_date)
 );
+
+-- Picker labels: what the employee sees ("#daily-updates", "@Raj Kalola", "Me ...").
+-- channel holds a channel name, a channel ID (C/G...) or a person's user ID (U...).
+ALTER TABLE employees    ADD COLUMN IF NOT EXISTS default_channel_label TEXT NOT NULL DEFAULT '';
+ALTER TABLE day_plans    ADD COLUMN IF NOT EXISTS channel_label TEXT;
+ALTER TABLE auto_updates ADD COLUMN IF NOT EXISTS channel_label TEXT;

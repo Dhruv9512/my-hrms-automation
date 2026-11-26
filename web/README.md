@@ -33,7 +33,7 @@ cron-job.org calls `GET /api/cron/tick` every minute (weekdays 08:00–23:59 IST
 ## Slack app (once, by a Slack workspace admin)
 1. api.slack.com/apps → Create New App → From scratch → pick the workspace.
 2. OAuth & Permissions → **Redirect URL**: `https://<your-app>.vercel.app/api/slack/callback`.
-3. **User Token Scopes**: add `chat:write` (no bot scopes needed).
+3. **User Token Scopes**: add `chat:write`, `channels:read`, `groups:read`, `users:read`, `im:write` (no bot scopes needed). The read scopes power the "Send to" search (channels + people); `im:write` sends direct messages.
 4. Basic Information → copy **Client ID** and **Client Secret** into Vercel env.
 5. Manage Distribution is not needed for one workspace. Employees then click **Connect Slack**.
 

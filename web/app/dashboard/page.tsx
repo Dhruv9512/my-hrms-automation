@@ -1,11 +1,12 @@
 "use client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import SlackPicker from "@/components/SlackPicker";
 
 type Me = {
   name: string; email: string; mode: "off" | "day_plan" | "auto"; adminDisabled: boolean; paused: boolean; isAdmin: boolean;
-  slackConnected: boolean; defaultChannel: string; dryRun: boolean; today: string;
-  plan: { plan_date: string; leave_time: string | null; update_text: string; channel: string } | null;
-  autoUpdate: { update_text: string; channel: string; status: "pending" | "sent" | "failed"; result: string | null } | null;
+  slackConnected: boolean; defaultChannel: string; defaultChannelLabel: string; dryRun: boolean; today: string;
+  plan: { plan_date: string; leave_time: string | null; update_text: string; channel: string; channel_label: string | null } | null;
+  autoUpdate: { update_text: string; channel: string; channel_label: string | null; status: "pending" | "sent" | "failed"; result: string | null } | null;
   run: { kind: string; status: string; message: string | null } | null;
   history: { plan_date: string; status: string; result: string | null }[];
   logs: { at: string; level: string; message: string }[];
@@ -19,6 +20,8 @@ const SLACK_MSG: Record<string, [string, string]> = {
   not_configured: ["warn", "Slack is not set up yet by the admin."],
 };
 
+const destLabel = (channel: string, label: string | null | undefined) => label || (channel ? `#${channel}` : "");
+
 const prettyDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 const timeAgo = (at: string) => new Date(at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -27,9 +30,9 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<[string, string] | null>(null);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ date: "", leaveTime: "", updateText: "", channel: "" });
+  const [form, setForm] = useState({ date: "", leaveTime: "", updateText: "", channel: "", channelLabel: "" });
   const [autoEditing, setAutoEditing] = useState(false);
-  const [autoForm, setAutoForm] = useState({ updateText: "", channel: "" });
+  const [autoForm, setAutoForm] = useState({ updateText: "", channel: "", channelLabel: "" });
 
   const load = useCallback(async () => {
     const res = await fetch("/api/me", { cache: "no-store" });
@@ -56,6 +59,7 @@ export default function Dashboard() {
       leaveTime: data.plan?.leave_time || "",
       updateText: data.plan?.update_text || "",
       channel: data.plan?.channel || data.defaultChannel || "",
+      channelLabel: data.plan ? destLabel(data.plan.channel, data.plan.channel_label) : data.defaultChannelLabel || "",
     });
     setEditing(true);
   }
@@ -105,18 +109,25 @@ export default function Dashboard() {
   }
 
   function openAutoForm() {
-    setAutoForm({ updateText: me!.autoUpdate?.update_text || "", channel: me!.autoUpdate?.channel || me!.defaultChannel || "" });
+    const u = me!.autoUpdate;
+    setAutoForm({
+      updateText: u?.update_text || "",
+      channel: u?.channel || me!.defaultChannel || "",
+      channelLabel: u ? destLabel(u.channel, u.channel_label) : me!.defaultChannelLabel || "",
+    });
     setAutoEditing(true);
   }
 
   async function submitAutoUpdate(e: FormEvent) {
     e.preventDefault();
-    const ok = await api("/api/auto-update", "POST", autoForm, `Saved. It will be posted to #${autoForm.channel} right after today's checkout.`);
+    if (!autoForm.channel) return setFlash(["bad", "Choose where to send the update"]);
+    const ok = await api("/api/auto-update", "POST", autoForm, `Saved. It will be sent to ${autoForm.channelLabel} right after today's checkout.`);
     if (ok) setAutoEditing(false);
   }
 
   async function submitPlan(e: FormEvent) {
     e.preventDefault();
+    if (!form.channel) return setFlash(["bad", "Choose where to send the update"]);
     const ok = await api("/api/plan", "POST", form, `Scheduled for ${prettyDate(form.date)}${form.leaveTime ? ` at ${form.leaveTime}` : " at 8 hours worked"}.`);
     if (ok) setEditing(false);
   }
@@ -171,7 +182,7 @@ export default function Dashboard() {
                 <ul className="list">
                   <li><b>Date:</b> {prettyDate(me.plan.plan_date)}</li>
                   <li><b>Leave at:</b> {me.plan.leave_time || "8 hours after check-in"}</li>
-                  <li><b>Channel:</b> #{me.plan.channel}</li>
+                  <li><b>Send to:</b> {destLabel(me.plan.channel, me.plan.channel_label)}</li>
                   <li><b>Update:</b> <span style={{ whiteSpace: "pre-wrap" }}>{me.plan.update_text}</span></li>
                 </ul>
                 <button className="btn ghost" style={{ marginTop: 8 }} onClick={() => openPlanForm(me)} disabled={busy || blocked}>Edit</button>
@@ -213,7 +224,7 @@ export default function Dashboard() {
           {me.autoUpdate && !autoEditing ? (
             <>
               <ul className="list">
-                <li><b>Channel:</b> #{me.autoUpdate.channel}</li>
+                <li><b>Send to:</b> {destLabel(me.autoUpdate.channel, me.autoUpdate.channel_label)}</li>
                 <li><b>Update:</b> <span style={{ whiteSpace: "pre-wrap" }}>{me.autoUpdate.update_text}</span></li>
                 {me.autoUpdate.status !== "pending" && me.autoUpdate.result && <li className="muted">{me.autoUpdate.result}</li>}
               </ul>
@@ -228,8 +239,9 @@ export default function Dashboard() {
             <form onSubmit={submitAutoUpdate}>
               <label htmlFor="aupdate">Update for today ({prettyDate(me.today)})</label>
               <textarea id="aupdate" required maxLength={3000} placeholder={"- Finished login page\n- Fixed payroll bug"} value={autoForm.updateText} onChange={(e) => setAutoForm({ ...autoForm, updateText: e.target.value })} />
-              <label htmlFor="achannel">Slack channel</label>
-              <div className="chan"><span>#</span><input id="achannel" required placeholder="daily-updates" value={autoForm.channel} onChange={(e) => setAutoForm({ ...autoForm, channel: e.target.value.replace(/^#/, "") })} /></div>
+              <label htmlFor="achannel">Send to</label>
+              <SlackPicker id="achannel" value={{ id: autoForm.channel, label: autoForm.channelLabel }} onChange={(d) => setAutoForm({ ...autoForm, channel: d.id, channelLabel: d.label })} />
+              <p className="muted small" style={{ margin: "6px 0 0" }}>A channel you're in, a person (direct message), or yourself. Sent as you.</p>
               {!me.slackConnected && <div className="banner warn small" style={{ marginTop: 12 }}>Slack is not connected yet, so the update won't be sent. Connect Slack below.</div>}
               <div className="row" style={{ marginTop: 16 }}>
                 <button className="btn" disabled={busy}>{busy ? "Saving…" : "Save update"}</button>
@@ -259,9 +271,9 @@ export default function Dashboard() {
           {form.leaveTime && <div className="banner warn small" style={{ marginTop: 12 }}>If this time is before you complete 8 hours, HRMS may mark an <b>early checkout</b> or <b>half day</b>.</div>}
           <label htmlFor="update">Today's update</label>
           <textarea id="update" required maxLength={3000} placeholder={"- Finished login page\n- Fixed payroll bug\n- Tomorrow: reports"} value={form.updateText} onChange={(e) => setForm({ ...form, updateText: e.target.value })} />
-          <label htmlFor="channel">Slack channel</label>
-          <div className="chan"><span>#</span><input id="channel" required placeholder="daily-updates" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value.replace(/^#/, "") })} /></div>
-          <p className="muted small" style={{ margin: "6px 0 0" }}>Your update is posted here, as you. You must be a member of this channel.</p>
+          <label htmlFor="channel">Send to</label>
+          <SlackPicker id="channel" value={{ id: form.channel, label: form.channelLabel }} onChange={(d) => setForm({ ...form, channel: d.id, channelLabel: d.label })} />
+          <p className="muted small" style={{ margin: "6px 0 0" }}>A channel you're in, a person (direct message), or yourself. Sent as you.</p>
           {!me.slackConnected && <div className="banner warn small" style={{ marginTop: 12 }}>Slack is not connected yet, so the update won't be sent. Connect Slack below.</div>}
           <div className="row" style={{ marginTop: 16 }}>
             <button className="btn" disabled={busy}>{busy ? "Saving…" : planOn ? "Save changes" : autoOn ? "Submit & switch off Auto checkout" : "Submit"}</button>
