@@ -49,5 +49,6 @@ export function hm(seconds: number): string {
 
 export function fmtIstTime(d: Date | string | null | undefined): string {
   if (!d) return "—";
-  return ist(new Date(d)).time.slice(0, 5);
+  const [h, m] = ist(new Date(d)).time.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }

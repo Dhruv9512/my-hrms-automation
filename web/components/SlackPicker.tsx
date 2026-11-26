@@ -1,6 +1,7 @@
 "use client";
 // Searchable "Send update to" picker: yourself, your Slack channels, or any person.
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { AtSign, Check, ChevronDown, Hash, Lock, Search, User } from "lucide-react";
 
 export type Dest = { id: string; label: string };
 type Target = { id: string; label: string; kind: "me" | "channel" | "private" | "person"; sub?: string };
@@ -17,7 +18,7 @@ function loadTargets(): Promise<LoadResult> {
   return cache;
 }
 
-const ICON: Record<Target["kind"], string> = { me: "👤", channel: "#", private: "🔒", person: "@" };
+const ICON = { me: User, channel: Hash, private: Lock, person: AtSign } as const;
 const GROUPS: [string, Target["kind"][]][] = [["You", ["me"]], ["Channels", ["channel", "private"]], ["People", ["person"]]];
 const CHANNEL_NAME = /^[a-z0-9._-]{1,80}$/;
 
@@ -74,33 +75,35 @@ export default function SlackPicker({ id, value, onChange, disabled }: {
         aria-controls={`${id}-list`}
         autoComplete="off"
         disabled={disabled}
-        placeholder={value.id ? value.label : "Search a channel or a person…"}
+        placeholder={value.id ? value.label : "Search channels and people"}
         value={open ? query : value.label}
         onFocus={() => { setOpen(true); setQuery(""); }}
         onBlur={() => { setOpen(false); setQuery(""); }}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onKeyDown={onKey}
       />
-      <span className="picker-caret" aria-hidden>▾</span>
+      <Search className="picker-lead" aria-hidden />
+      <ChevronDown className="picker-caret" aria-hidden />
       {open && (
         <div className="picker-list" id={`${id}-list`} role="listbox" ref={listRef}>
-          {!data && <div className="picker-empty">Loading your Slack channels and people…</div>}
+          {!data && <div className="picker-empty">Loading channels and people</div>}
           {failed && (
             <div className="picker-empty">
               {failed.error}.{" "}
               {(failed.needsReconnect || failed.needsConnect) && (
                 <a href="/api/slack/connect" onMouseDown={(e) => e.preventDefault()}>{failed.needsConnect ? "Connect Slack" : "Reconnect Slack"}</a>
               )}
-              {failed.needsReconnect && <div className="small muted">Until then, type a channel name.</div>}
+              {failed.needsReconnect && <div className="small muted">Until then, type a channel name</div>}
             </div>
           )}
-          {data && !failed && flat.length === 0 && <div className="picker-empty">No match for “{query}”.</div>}
+          {data && !failed && flat.length === 0 && <div className="picker-empty">No match for “{query}”</div>}
           {groups.map((g) => (
             <div key={g.title}>
               <div className="picker-group">{g.title}</div>
               {g.items.map((t) => {
                 i += 1;
                 const idx = i;
+                const Icon = ICON[t.kind];
                 return (
                   <div
                     key={`${t.kind}-${t.id}`}
@@ -111,10 +114,10 @@ export default function SlackPicker({ id, value, onChange, disabled }: {
                     onMouseEnter={() => setActive(idx)}
                     onMouseDown={(e) => { e.preventDefault(); pick(t); }}
                   >
-                    <span className="picker-icon">{ICON[t.kind]}</span>
+                    <Icon />
                     <span className="picker-label">{t.label.replace(/^[#@]/, "")}</span>
-                    {t.sub && <span className="muted small">{t.sub}</span>}
-                    {value.id === t.id && <span className="picker-check">✓</span>}
+                    {t.sub && <span className="picker-sub">{t.sub}</span>}
+                    {value.id === t.id && <Check className="check" />}
                   </div>
                 );
               })}

@@ -58,6 +58,15 @@ export async function claimDue(now = new Date()) {
 
 type Run = Record<string, any>;
 
+type DaySnap = { checkIn: Date | null; worked: number; onBreak: boolean; at: Date };
+
+async function saveSnapshot(run: Run, d: DaySnap) {
+  const breakSec = d.checkIn ? Math.max(0, Math.round((d.at.getTime() - d.checkIn.getTime()) / 1000) - d.worked) : 0;
+  await sql`UPDATE daily_runs SET check_in_at = ${d.checkIn?.toISOString() ?? null}::timestamptz, break_seconds = ${breakSec},
+              worked_seconds = ${d.worked}, on_break = ${d.onBreak}, checked_at = ${d.at.toISOString()}::timestamptz
+            WHERE employee_id = ${run.employee_id} AND run_date = ${run.run_date}`;
+}
+
 async function setRun(run: Run, fields: { status?: string; next?: Date; target?: Date | null; message: string; resetAttempts?: boolean }) {
   await sql`UPDATE daily_runs SET
               status = COALESCE(${fields.status ?? null}, status),
@@ -136,7 +145,8 @@ export async function processRun(run: Run, now = new Date()) {
     }
 
     // Working: when is the target?
-    const { worked, onBreak } = workedSeconds(info, now);
+    const { worked, onBreak, checkIn } = workedSeconds(info, now);
+    await saveSnapshot(run, { checkIn, worked, onBreak, at: now });
     const target =
       run.kind === "day_plan" && plan?.leave_time
         ? istDateTime(t.date, String(plan.leave_time))
@@ -148,7 +158,7 @@ export async function processRun(run: Run, now = new Date()) {
         msg = `DRY RUN: would check out now (worked ${hm(worked)}).`;
       } else {
         const res = await hrmsCheckout(token);
-        msg = `Checked out at ${t.time.slice(0, 5)} (worked ${hm(worked)}). HRMS: ${res.message || "OK"}.`;
+        msg = `Checked out at ${fmtIstTime(now)} (worked ${hm(worked)}). HRMS: ${res.message || "OK"}.`;
       }
       msg += await postUpdate(emp, run, plan);
       await finishPlan(run, "done", msg);

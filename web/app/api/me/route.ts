@@ -17,7 +17,8 @@ export async function GET() {
                update_text, channel, channel_label, status, result
         FROM day_plans WHERE employee_id = ${e.id} AND status = 'pending'
         ORDER BY plan_date LIMIT 1`,
-    sql`SELECT kind, status, message, target_at, updated_at FROM daily_runs
+    sql`SELECT kind, status, message, target_at, next_check_at, updated_at, check_in_at, break_seconds,
+               worked_seconds, on_break, checked_at FROM daily_runs
         WHERE employee_id = ${e.id} AND run_date = ${today}`,
     sql`SELECT plan_date::text AS plan_date, status, result FROM day_plans
         WHERE employee_id = ${e.id} AND status <> 'pending' ORDER BY plan_date DESC, id DESC LIMIT 5`,

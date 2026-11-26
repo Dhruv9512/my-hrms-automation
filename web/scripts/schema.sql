@@ -82,3 +82,10 @@ CREATE TABLE IF NOT EXISTS auto_updates (
 ALTER TABLE employees    ADD COLUMN IF NOT EXISTS default_channel_label TEXT NOT NULL DEFAULT '';
 ALTER TABLE day_plans    ADD COLUMN IF NOT EXISTS channel_label TEXT;
 ALTER TABLE auto_updates ADD COLUMN IF NOT EXISTS channel_label TEXT;
+
+-- Workday snapshot for the dashboard's day line (saved on every scheduler check).
+ALTER TABLE daily_runs ADD COLUMN IF NOT EXISTS check_in_at   TIMESTAMPTZ;
+ALTER TABLE daily_runs ADD COLUMN IF NOT EXISTS break_seconds INT;
+ALTER TABLE daily_runs ADD COLUMN IF NOT EXISTS worked_seconds INT;
+ALTER TABLE daily_runs ADD COLUMN IF NOT EXISTS on_break      BOOLEAN;
+ALTER TABLE daily_runs ADD COLUMN IF NOT EXISTS checked_at    TIMESTAMPTZ;
