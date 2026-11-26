@@ -22,6 +22,18 @@ const SLACK_MSG: Record<string, [string, string]> = {
 
 const destLabel = (channel: string, label: string | null | undefined) => label || (channel ? `#${channel}` : "");
 
+// Leave times are always afternoon/evening (12:00-22:59), so "04:25" can only mean 4:25 PM.
+const toAfternoon = (v: string) => {
+  const m = /^(\d{2}):(\d{2})$/.exec(v);
+  if (!m) return v;
+  const h = Number(m[1]);
+  return h >= 1 && h <= 10 ? `${String(h + 12).padStart(2, "0")}:${m[2]}` : v;
+};
+const to12h = (v: string) => {
+  const [h, m] = v.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+};
+
 const prettyDate = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 const timeAgo = (at: string) => new Date(at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -181,7 +193,7 @@ export default function Dashboard() {
               <div style={{ marginTop: 14 }}>
                 <ul className="list">
                   <li><b>Date:</b> {prettyDate(me.plan.plan_date)}</li>
-                  <li><b>Leave at:</b> {me.plan.leave_time || "8 hours after check-in"}</li>
+                  <li><b>Leave at:</b> {me.plan.leave_time ? to12h(me.plan.leave_time) : "8 hours after check-in"}</li>
                   <li><b>Send to:</b> {destLabel(me.plan.channel, me.plan.channel_label)}</li>
                   <li><b>Update:</b> <span style={{ whiteSpace: "pre-wrap" }}>{me.plan.update_text}</span></li>
                 </ul>
@@ -264,8 +276,11 @@ export default function Dashboard() {
             </div>
             <div>
               <label htmlFor="leave">Leave time <span className="muted">(optional)</span></label>
-              <input id="leave" type="time" min="12:00" max="22:59" value={form.leaveTime} onChange={(e) => setForm({ ...form, leaveTime: e.target.value })} />
-              <p className="muted small" style={{ margin: "6px 0 0" }}>Between 12:00 PM and 10:59 PM. Empty = check out when you complete <b>8 hours</b>.</p>
+              <input id="leave" type="time" value={form.leaveTime} onChange={(e) => setForm({ ...form, leaveTime: toAfternoon(e.target.value) })} />
+              <p className="muted small" style={{ margin: "6px 0 0" }}>
+                {form.leaveTime ? <>Checkout at <b>{to12h(form.leaveTime)}</b>. </> : null}
+                Between 12:00 PM and 10:59 PM (typing 4:25 means 4:25 PM). Empty = check out when you complete <b>8 hours</b>.
+              </p>
             </div>
           </div>
           {form.leaveTime && <div className="banner warn small" style={{ marginTop: 12 }}>If this time is before you complete 8 hours, HRMS may mark an <b>early checkout</b> or <b>half day</b>.</div>}
