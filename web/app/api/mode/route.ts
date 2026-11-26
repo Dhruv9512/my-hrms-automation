@@ -15,6 +15,8 @@ export async function POST(req: Request) {
             WHERE employee_id = ${r.emp.id} AND status = 'pending'`;
   await sql`UPDATE employees SET mode = ${mode}, updated_at = now() WHERE id = ${r.emp.id}`;
   // Drop today's not-yet-finished schedule so the scheduler rebuilds it for the new mode.
-  await sql`DELETE FROM daily_runs WHERE employee_id = ${r.emp.id} AND run_date = ${ist().date} AND status = 'waiting'`;
+  // Turning auto on rebuilds today's run even if an earlier one today already finished.
+  if (mode === "auto") await sql`DELETE FROM daily_runs WHERE employee_id = ${r.emp.id} AND run_date = ${ist().date}`;
+  else await sql`DELETE FROM daily_runs WHERE employee_id = ${r.emp.id} AND run_date = ${ist().date} AND status = 'waiting'`;
   return NextResponse.json({ ok: true, mode });
 }

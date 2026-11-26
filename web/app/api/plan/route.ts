@@ -39,7 +39,9 @@ export async function POST(req: Request) {
             VALUES (${r.emp.id}, ${date}, ${leaveTime}, ${updateText}, ${channel}, ${channelLabel})`;
   await sql`UPDATE employees SET mode = 'day_plan', default_channel = ${channel}, default_channel_label = ${channelLabel},
             updated_at = now() WHERE id = ${r.emp.id}`;
-  await sql`DELETE FROM daily_runs WHERE employee_id = ${r.emp.id} AND run_date = ${today} AND status = 'waiting'`;
+  // Rebuild today's schedule for the new plan, even if an earlier run today already finished
+  // (otherwise a second plan for the same day would never run).
+  await sql`DELETE FROM daily_runs WHERE employee_id = ${r.emp.id} AND run_date = ${today}`;
   return NextResponse.json({ ok: true });
 }
 
